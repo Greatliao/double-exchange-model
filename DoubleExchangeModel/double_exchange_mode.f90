@@ -186,15 +186,17 @@ program double_exchange
     !M, size of basis
     !t, J_para, kesai, the parameter if H
     !##########################################
-
-    integer :: L, N, M, i, info
+    external dsyev
+    integer :: L, N, M, i, info, lwork
     real*8 :: t, J_para, kesai
-    integer, allocatable, dimension(:) :: basis
+    integer, allocatable, dimension(:) :: basis,  work
+    real*8, allocatable, dimension(:) :: lambda
     real*8, allocatable, dimension(:,:) :: H, Hf, Hs, Hsf
-    L = 2
     open(unit = 12, file = 'data.dat')
     open(unit = 11, file = 'basis.dat')
+    L = 2
     N = L*L
+    lwork = 3*N-1
     M = 0
     t = 1.0
     J_para = 1.0
@@ -218,6 +220,8 @@ program double_exchange
     do i = 1, M
         write(12,*) H(i,:)
     end do
+    allocate(lambda(M), work(lwork))
 
-
+    call dsyev('N', 'U', M, H, M, lambda, work, lwork, info)
+    write(*,*) 'info = ', info
 end program double_exchange
