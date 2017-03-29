@@ -186,17 +186,16 @@ program double_exchange
     !M, size of basis
     !t, J_para, kesai, the parameter if H
     !##########################################
-    external dsyev
-    integer :: L, N, M, i, info, lwork
+    integer :: L, N, M, i, j, info
     real*8 :: t, J_para, kesai
-    integer, allocatable, dimension(:) :: basis,  work
-    real*8, allocatable, dimension(:) :: lambda
-    real*8, allocatable, dimension(:,:) :: H, Hf, Hs, Hsf
-    open(unit = 12, file = 'data.dat')
+    integer, allocatable, dimension(:) :: basis
+    real*8, allocatable, dimension(:) :: Hap, Eig, Work
+    real*8, allocatable, dimension(:,:) :: H, Hf, Hs, Hsf, Vector
+    open(unit = 12, file = 'H.dat')
     open(unit = 11, file = 'basis.dat')
+    open(unit = 13, file = 'Eig.bat')
     L = 2
     N = L*L
-    lwork = 3*N-1
     M = 0
     t = 1.0
     J_para = 1.0
@@ -220,8 +219,36 @@ program double_exchange
     do i = 1, M
         write(12,*) H(i,:)
     end do
-    allocate(lambda(M), work(lwork))
+    allocate( Hap(int(M*(M+1)/2)), Eig(M), Vector(1,M), Work(3*M) )
+    Hap = 0
+    Eig = 0
+    do i = 1, M
+        do j = 1, M
+            Vector(i,j) = 0
+        end do
+    end do
 
-    call dsyev('N', 'U', M, H, M, lambda, work, lwork, info)
+    do i = 1, M
+        do j = 1, M
+            if (i <= j) then
+                Hap(int(i+(j-1)*j/2)) = H(i,j)
+            end if
+        end do
+    end do
+
+    call dspev('N', 'U', M, Hap, Eig, Vector, 1, Work, info)
     write(*,*) 'info = ', info
+    do i = 1, M
+        write(13,*) Eig(i)
+    end do
+    deallocate(basis)
+    deallocate(Hap)
+    deallocate(Eig)
+    deallocate(Work)
+    deallocate(H)
+    deallocate(Hf)
+    deallocate(Hs)
+    deallocate(Hsf)
+    deallocate(Vector)
+  
 end program double_exchange
