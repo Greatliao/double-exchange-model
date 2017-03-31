@@ -5,11 +5,8 @@
 module dou_ex
 contains
 
-    subroutine init_basis( N, M, basis)
-        integer :: i, j, k, N, M, a, num_1, num_2, num_3
-        integer, dimension(2**(3*N)) :: state 
-        integer, allocatable, dimension(:) :: basis
-        state = 0
+    subroutine init_basis( N, M, state)
+        integer :: i, j, k, N, M, a, num_1, num_2, num_3, state(2**(3*N))
         M = 0
         do i = 0, N, 1
             do j = 0, N, 1
@@ -38,11 +35,6 @@ contains
         write(*,*) 2**(3*N)
         Write(*,*) 2**(2*N)
         write(*,*) M
-        allocate( basis(M) )
-        do i = 1, M
-            basis(i) = state(i)
-        end do
-
     end subroutine init_basis
 
     subroutine cau_Hf( L, N, M, basis, Hf, t )
@@ -51,9 +43,7 @@ contains
         !###############################################
         implicit none
         integer :: L, N, M, basis(M), i, j, k, i_new, j_new, N_ij, N_i1j, N_ij1, b, e
-        real*8 :: t
-        real*8, allocatable, dimension(:,:) :: Hf
-        allocate( Hf(M, M) )
+        real*8 :: t, Hf(M, M)
         do i = 1, M
             do j = 1, M
                 Hf(i,j) =0
@@ -105,9 +95,7 @@ contains
     subroutine cau_Hs( L, M, basis, Hs, J_para)
         implicit none
         integer :: L, M, basis(M), i, j, k, i_new, j_new, N_ij, N_i1j, N_ij1
-        real*8 :: J_para
-        real*8, allocatable, dimension(:,:) :: Hs
-        allocate( Hs(M, M) )
+        real*8 :: J_para, Hs(M, M)
         do i = 1, M
             do j = 1, M
                 Hs(i,j) =0
@@ -134,9 +122,7 @@ contains
     subroutine cau_Hsf( L, N, M, basis, Hsf, kesai )
         implicit none
         integer :: L, N, M, basis(M), i, j, k, N_ij
-        real*8 :: kesai
-        real*8, allocatable, dimension(:,:) :: Hsf
-        allocate( Hsf(M, M) )
+        real*8 :: kesai, Hsf(M, M)
         do i = 1, M
             do j = 1, M
                 Hsf(i,j) =0
@@ -157,9 +143,7 @@ contains
     subroutine cau_H( M, Hf, Hs, Hsf, H )
         implicit none
         integer :: M, i, j
-        real*8 Hf(M,M), Hs(M,M), Hsf(M,M)
-        real*8, allocatable, dimension(:,:) :: H
-        allocate( H(M, M) )
+        real*8 Hf(M,M), Hs(M,M), Hsf(M,M), H(M, M)
         do i = 1, M
             do j = 1, M
                 H(i,j) =0
@@ -176,6 +160,7 @@ contains
     
 
 end module dou_ex
+
 program double_exchange
 
     use dou_ex
@@ -188,12 +173,12 @@ program double_exchange
     !##########################################
     integer :: L, N, M, i, j, info
     real*8 :: t, J_para, kesai
-    integer, allocatable, dimension(:) :: basis
+    integer, allocatable, dimension(:) :: basis, state
     real*8, allocatable, dimension(:) :: Hap, Eig, Work
     real*8, allocatable, dimension(:,:) :: H, Hf, Hs, Hsf, Vector
-    open(unit = 12, file = 'H.dat')
-    open(unit = 11, file = 'basis.dat')
-    open(unit = 13, file = 'Eig.bat')
+    open(unit = 12, file = 'H.dat', status = 'replace', action = 'write')
+    open(unit = 11, file = 'basis.dat',  status = 'replace', action = 'write')
+    open(unit = 13, file = 'Eig.bat',  status = 'replace', action = 'write')
     L = 2
     N = L*L
     M = 0
@@ -201,11 +186,17 @@ program double_exchange
     J_para = 1.0
     kesai = 1.0
     !init the basis
-    call init_basis( N, M, basis )
+    allocate(state(2**(3*N)))
+    call init_basis( N, M, state)
+    allocate( basis(M), Hs(M, M), Hf(M, M), Hsf(M, M), H(M, M) )
+
     write(*,*) 'init_basis'
     do i = 1, M
+        basis(i) = state(i)
         Write(11,*) basis(i)
     end do
+    deallocate(state)
+
     !caculate the H
     call cau_Hf( L, N, M, basis, Hf, t )
     write(*,*) 'cau_Hf'
@@ -214,6 +205,7 @@ program double_exchange
     call cau_Hsf( L, N, M, basis, Hsf, kesai ) 
     write(*,*) 'cau_Hsf'
     call cau_H( M, Hf, Hs, Hsf, H ) 
+    deallocate(Hf, Hs, Hsf)
     
     write(*,*) 'cau_H'
     do i = 1, M
@@ -236,19 +228,15 @@ program double_exchange
         end do
     end do
 
-    call dspev('N', 'U', M, Hap, Eig, Vector, 1, Work, info)
+    call dspev('N', 'U', M, Hap, Eig, Vector, M, Work, info)
     write(*,*) 'info = ', info
     do i = 1, M
         write(13,*) Eig(i)
     end do
+    close(12)
+    close(13)
+    close(11)
     deallocate(basis)
-    deallocate(Hap)
     deallocate(Eig)
-    deallocate(Work)
     deallocate(H)
-    deallocate(Hf)
-    deallocate(Hs)
-    deallocate(Hsf)
-    deallocate(Vector)
-  
 end program double_exchange
