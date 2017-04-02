@@ -5,19 +5,15 @@
 module dou_ex
 contains
 
-    subroutine init_basis( N, M, state)
-        integer :: i, j, k, N, M, a, num_1, num_2, num_3, state(2**(3*N))
-        M = 0
-        do i = 0, N, 1
+    subroutine init_basis( N, MM, state)
+        integer :: i, j, k, N, MM, a, num_2, num_3, state(2**(3*N))
+        MM = 0
+        do i = 0, 2**N-1, 1
             do j = 0, N, 1
                 do a = 0, 2**(3*N)-1, 1
-                    num_1 = 0
                     num_2 = 0
                     num_3 = 0
                     do k = 0, N-1, 1
-                        if ( btest(a, k+2*N) ) then
-                            num_1 = num_1+1
-                        end if
                         if ( btest(a, k+N) ) then
                             num_2 = num_2+1
                         end if
@@ -25,16 +21,16 @@ contains
                             num_3 = num_3+1
                         end if
                     end do
-                    if ( num_1 == i .AND. num_2 == N-i .AND. num_3 == j) then
-                        M = M+1
-                        state(M) = a
+                    if ( ibits( a, 2*N-1, N ) == i .AND. num_2 == j .AND. num_3 == N-j) then
+                        MM = MM+1
+                        state(MM) = a
                     end if
                 end do
             end do
         end do
         write(*,*) 2**(3*N)
         Write(*,*) 2**(2*N)
-        write(*,*) M
+        write(*,*) MM
     end subroutine init_basis
 
     subroutine cau_Hf( L, N, M, basis, Hf, t )
@@ -171,72 +167,70 @@ program double_exchange
     !M, size of basis
     !t, J_para, kesai, the parameter if H
     !##########################################
-    integer :: L, N, M, i, j, info
-    real*8 :: t, J_para, kesai
-    integer, allocatable, dimension(:) :: basis, state
+    integer :: L, N, M, MM, i, j, k, info
+    real*8 :: t, J_para, kesai, beta, w, kb, Tc
+    integer, allocatable, dimension(:) :: state, basis
     real*8, allocatable, dimension(:) :: Hap, Eig, Work
     real*8, allocatable, dimension(:,:) :: H, Hf, Hs, Hsf, Vector
-    open(unit = 12, file = 'H.dat', status = 'replace', action = 'write')
-    open(unit = 11, file = 'basis.dat',  status = 'replace', action = 'write')
-    open(unit = 13, file = 'Eig.bat',  status = 'replace', action = 'write')
+    open(unit = 13, file = 'configuration-weight.bat', action = 'write')
+
+    open(unit = 11, file = 'EigValue.bat', action = 'write')
+    L = 2
     L = 2
     N = L*L
+    MM = 0
     M = 0
     t = 1.0
     J_para = 1.0
-    kesai = 1.0
+    kesai = 10.0
+    kb = 0.01 
+    Tc = 0.12
+    beta = 1.0/kb/Tc
     !init the basis
     allocate(state(2**(3*N)))
-    call init_basis( N, M, state)
+    call init_basis( N, MM, state)
+    M = int(MM/(2**N)) 
+    Write(*,*) (MM/(2**N)), "=?", M
+
     allocate( basis(M), Hs(M, M), Hf(M, M), Hsf(M, M), H(M, M) )
-
-    write(*,*) 'init_basis'
-    do i = 1, M
-        basis(i) = state(i)
-        Write(11,*) basis(i)
-    end do
-    deallocate(state)
-
-    !caculate the H
-    call cau_Hf( L, N, M, basis, Hf, t )
-    write(*,*) 'cau_Hf'
-    call cau_Hs( L, M, basis, Hs, J_para ) 
-    write(*,*) 'cau_Hs'
-    call cau_Hsf( L, N, M, basis, Hsf, kesai ) 
-    write(*,*) 'cau_Hsf'
-    call cau_H( M, Hf, Hs, Hsf, H ) 
-    deallocate(Hf, Hs, Hsf)
-    
-    write(*,*) 'cau_H'
-    do i = 1, M
-        write(12,*) H(i,:)
-    end do
     allocate( Hap(int(M*(M+1)/2)), Eig(M), Vector(1,M), Work(3*M) )
-    Hap = 0
-    Eig = 0
-    do i = 1, M
-        do j = 1, M
-            Vector(i,j) = 0
-        end do
-    end do
 
-    do i = 1, M
-        do j = 1, M
-            if (i <= j) then
-                Hap(int(i+(j-1)*j/2)) = H(i,j)
-            end if
-        end do
-    end do
+    do k = 1, 2**N
 
-    call dspev('N', 'U', M, Hap, Eig, Vector, M, Work, info)
-    write(*,*) 'info = ', info
-    do i = 1, M
-        write(13,*) Eig(i)
+        do j = 1, M
+            basis(j) = state( (k-1)*M+j )
+        end do
+
+        !caculate the H
+        call cau_Hf( L, N, M, basis, Hf, t )
+        call cau_Hs( L, M, basis, Hs, J_para ) 
+        call cau_Hsf( L, N, M, basis, Hsf, kesai ) 
+        call cau_H( M, Hf, Hs, Hsf, H ) 
+    
+        do i = 1, M
+            do j = 1, M
+                if (i <= j) then
+                    Hap(int(i+(j-1)*j/2)) = H(i,j)
+                end if
+            end do
+        end do
+
+        call dspev('N', 'U', M, Hap, Eig, Vector, M, Work, info)
+        write(*,*) 'info = ', info
+        w = 1.0 
+        do i = 1, M
+            W =  w*( 1+exp(-beta*Eig(i)) ) 
+        end do
+         
+        write(11,*) Eig(:) 
+        write(13,*) ibits( basis(1), 2*N-1, N ), w
+
     end do
-    close(12)
-    close(13)
-    close(11)
+    
+    deallocate(Hf, Hs, Hsf)
     deallocate(basis)
     deallocate(Eig)
     deallocate(H)
+    deallocate(state)
+
 end program double_exchange
