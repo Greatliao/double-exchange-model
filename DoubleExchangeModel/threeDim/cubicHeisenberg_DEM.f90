@@ -95,10 +95,10 @@ contains
         !end do
     end subroutine cau_Hsf
     
-    subroutine cau_H( M, Hf, Hsf, H, miu )
+    subroutine cau_H( M, Hf, Hsf, H )
         implicit none
         integer :: M, i, j
-        real*8 :: Hf(M,M), miu
+        real*8 :: Hf(M,M)
         complex*16 :: Hsf(M,M), H(M, M)
         do i = 1, M
             do j = 1, M
@@ -106,7 +106,6 @@ contains
             end do
         end do
         do i = 1, M
-            H(i,i) = H(i,i)-miu
             do j = 1, M
                 H(i,j) = Hf(i,j)+Hsf(i,j)
             end do
@@ -115,10 +114,10 @@ contains
 
     end subroutine cau_H
     
-    subroutine cau_W(M, H, beta, ln_Weight, Eig, Work, Rwork )
+    subroutine cau_W(M, H, beta, ln_Weight, Eig, Work, Rwork, miu )
         implicit none
         integer :: M, info, i, j
-        real*8 :: beta, ln_Weight
+        real*8 :: beta, ln_Weight, miu
         complex*16 :: H(M,M), Work(3*M)
         real*8 :: Eig(M),  Rwork(3*M-2)
 
@@ -129,7 +128,7 @@ contains
         ln_Weight = 0.0 
         !write(*,*) Eig(:)
         do i = 1, M
-            ln_Weight = ln_Weight+log( 1+exp( (-1)*beta*Eig(i) ) )
+            ln_Weight = ln_Weight+log( 1+exp( (-1)*beta*(Eig(i)-miu) ) )
         end do
     end subroutine cau_W
 
@@ -238,8 +237,8 @@ do ii = 1, Num_T
     do i = 1, num_MC 
         dd = di(d)
         call cau_Hsf( N, M, Hsf, J_para, fai(d,:), theta(d,:))
-        call cau_H( M, Hf, Hsf, H, miu )
-        call cau_W(M, H, beta, ln_Weight, Eig, Work, Rwork )
+        call cau_H( M, Hf, Hsf, H )
+        call cau_W(M, H, beta, ln_Weight, Eig, Work, Rwork, miu )
         En(i) = (-1)*ln_Weight/beta 
         x = ran()
         p = int(x*N)+1 
@@ -254,16 +253,16 @@ do ii = 1, Num_T
         if ( fai(dd,p) > 2*PI ) then
             fai(dd,p) = fai(dd,p)-2*PI
         end if
-        call cau_Hsf( N, M, Hsf, J_para, fai(dd,:), theta(dd,:))
-        call cau_H( M, Hf, Hsf, H, miu )
-        call cau_W(M, H, beta, ln_Weight_new_fai, Eig, Work, Rwork )
+        !call cau_Hsf( N, M, Hsf, J_para, fai(dd,:), theta(dd,:))
+        !call cau_H( M, Hf, Hsf, H )
+        !call cau_W(M, H, beta, ln_Weight_new_fai, Eig, Work, Rwork, miu )
 
         !write(*,*) exp((-1)*beta*(energy_new-energy))
-        x = ran()
-        if ( x > exp( ln_Weight_new_fai-ln_Weight ) ) then
-            fai(dd, p) = fai(d, p)
-            ln_Weight_new_fai = ln_Weight
-        end if
+        !x = ran()
+        !if ( x > exp( ln_Weight_new_fai-ln_Weight ) ) then
+        !    fai(dd, p) = fai(d, p)
+        !    ln_Weight_new_fai = ln_Weight
+        !end if
 
         x = ran()
         theta(dd, p) = theta(d,p)+(x-0.5)*2*PI/6
@@ -274,12 +273,13 @@ do ii = 1, Num_T
             theta(dd,p) = theta(dd,p)-PI
         end if
         call cau_Hsf( N, M, Hsf, J_para, fai(dd,:), theta(dd,:))
-        call cau_H( M, Hf, Hsf, H, miu )
-        call cau_W(M, H, beta, ln_Weight_new_theta, Eig, Work, Rwork )
+        call cau_H( M, Hf, Hsf, H )
+        call cau_W(M, H, beta, ln_Weight_new_theta, Eig, Work, Rwork, miu )
 
         x = ran()
         !write(*,*) ln_Weight, ln_Weight_new_fai, ln_Weight_new_theta, i
-        if ( x > exp( ln_Weight_new_theta-ln_Weight_new_fai ) ) then
+        if ( x > exp( ln_Weight_new_theta-ln_Weight ) ) then
+            fai(dd,p) = fai(d,p)
             theta(dd, p) = theta(d, p)
         end if
         ss(i) = 0
@@ -297,7 +297,7 @@ do ii = 1, Num_T
                 ss(i) = ss(i)+cos(theta(d,j))*cos(theta(d,k))
             end do
         end do
-        s_M(i) = sqrt(sx**2+sy**2+sz**2)/N
+        s_M(i) = sqrt(sx**2+sy**2+sz**2)/N/N
         ss(i) = ss(i)/N/N
         d = dd
         !write(*,*) i/(num_MC/100)
